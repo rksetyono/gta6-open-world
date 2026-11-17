@@ -3,17 +3,116 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Block Dodger</title>
+<title>Sunset Bay — Open World Crime</title>
 <style>
-  html, body { margin: 0; height: 100%; overflow: hidden; background: #11141b; }
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #10131a; font-family: system-ui, -apple-system, "Segoe UI", sans-serif; }
   #game { position: fixed; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
-  /* Read aloud, never shown: the status line screen readers announce. */
   #status { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+
+  /* --- HUD --- */
+  #hud { position: fixed; inset: 0; pointer-events: none; color: #eef1f5; z-index: 5; }
+  .panel { background: rgba(12, 16, 24, 0.62); border: 1px solid rgba(255,255,255,0.14); border-radius: 10px; backdrop-filter: blur(3px); }
+  #stats { position: absolute; top: 14px; left: 14px; padding: 10px 14px; min-width: 210px; }
+  #wanted-stars { font-size: 22px; letter-spacing: 3px; line-height: 1; }
+  #wanted-stars .star { color: rgba(255,255,255,0.25); }
+  #wanted-stars .star.on { color: #ffcf3f; text-shadow: 0 0 8px rgba(255, 180, 0, 0.9); }
+  #health-row { display: flex; align-items: center; gap: 8px; margin-top: 8px; }
+  #health-bar { flex: 1; height: 10px; background: rgba(255,255,255,0.15); border-radius: 5px; overflow: hidden; }
+  #health-fill { height: 100%; width: 100%; background: #57c465; transition: width 0.2s; }
+  #health-text { font-size: 13px; font-weight: 700; min-width: 28px; text-align: right; }
+  #cash { font-size: 20px; font-weight: 800; color: #7fd67f; margin-top: 6px; letter-spacing: 0.5px; }
+  #clock { font-size: 13px; color: #cfe8ff; margin-top: 2px; }
+  #mission-label { font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: #ffd54f; margin-top: 8px; }
+  #objective { position: absolute; top: 14px; left: 50%; transform: translateX(-50%); padding: 9px 18px; text-align: center; max-width: 46vw; }
+  #objective-text { font-size: 15px; font-weight: 600; }
+  #minimap-wrap { position: absolute; top: 14px; right: 14px; padding: 6px; }
+  #minimap { display: block; width: 200px; height: 200px; border-radius: 6px; }
+  #speed { position: absolute; bottom: 18px; right: 20px; font-size: 30px; font-weight: 800; text-shadow: 0 2px 8px rgba(0,0,0,0.7); display: none; }
+  #hint { position: absolute; bottom: 16px; left: 16px; font-size: 12.5px; color: rgba(238,241,245,0.85); text-shadow: 0 1px 4px rgba(0,0,0,0.8); }
+  #flash-message { position: absolute; top: 96px; left: 50%; transform: translateX(-50%); font-size: 17px; font-weight: 700; text-shadow: 0 2px 8px rgba(0,0,0,0.9); opacity: 0; transition: opacity 0.4s; white-space: nowrap; }
+  #banner { position: absolute; top: 34%; left: 50%; transform: translateX(-50%); text-align: center; opacity: 0; transition: opacity 0.5s; pointer-events: none; }
+  #banner-title { font-size: 44px; font-weight: 900; letter-spacing: 4px; color: #ffd54f; text-shadow: 0 3px 18px rgba(0,0,0,0.85); }
+  #banner-sub { font-size: 18px; font-weight: 600; color: #fff; text-shadow: 0 2px 10px rgba(0,0,0,0.85); margin-top: 4px; }
+  #crosshair { position: absolute; top: 50%; left: 50%; width: 18px; height: 18px; margin: -9px 0 0 -9px; display: none; }
+  #crosshair::before, #crosshair::after { content: ""; position: absolute; background: rgba(255,255,255,0.9); box-shadow: 0 0 4px rgba(0,0,0,0.9); }
+  #crosshair::before { left: 8px; top: 0; width: 2px; height: 18px; }
+  #crosshair::after { top: 8px; left: 0; height: 2px; width: 18px; }
+  #vignette { position: fixed; inset: 0; pointer-events: none; opacity: 0; background: radial-gradient(ellipse at center, transparent 55%, rgba(200,0,0,0.55) 100%); }
+  #briefing { position: absolute; left: 16px; bottom: 64px; max-width: 380px; padding: 14px 16px; display: none; transition: opacity 0.6s; }
+  #briefing-title { font-size: 17px; font-weight: 800; color: #ffd54f; margin-bottom: 5px; }
+  #briefing-text { font-size: 13.5px; line-height: 1.45; color: #eef1f5; }
+
+  /* --- overlays --- */
+  .overlay { position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; z-index: 10; background: linear-gradient(180deg, rgba(10,14,22,0.55) 0%, rgba(10,14,22,0.82) 100%); color: #eef1f5; }
+  .overlay h1 { font-size: 64px; margin: 0; letter-spacing: 6px; font-weight: 900; color: #ffd54f; text-shadow: 0 4px 30px rgba(255, 170, 0, 0.45); }
+  .overlay h2 { font-size: 20px; font-weight: 600; margin: 6px 0 0; color: #ffd9a0; letter-spacing: 2px; }
+  .overlay p { max-width: 560px; font-size: 15px; line-height: 1.6; color: #dfe6ee; margin: 18px 0 8px; }
+  .overlay .controls { font-size: 13.5px; color: #b8c4d4; line-height: 1.9; margin: 10px 0 18px; }
+  .overlay button { pointer-events: auto; cursor: pointer; font-size: 17px; font-weight: 700; padding: 12px 34px; margin: 6px; border-radius: 8px; border: 1px solid rgba(255,213,79,0.6); background: #ffd54f; color: #1a1405; }
+  .overlay button.ghost { background: transparent; color: #ffd54f; border: 1px solid rgba(255,213,79,0.6); }
+  .overlay button:hover { filter: brightness(1.08); }
+  #title-best { font-size: 13.5px; color: #9fb4c8; margin-top: 14px; }
+  #pause-screen, #end-screen { display: none; }
+  #end-title { font-size: 72px; color: #ff5544; }
 </style>
+<script type="importmap">
+{ "imports": { "three": "./vendor/three.module.min.js" } }
+</script>
 </head>
 <body>
-<canvas id="game" aria-label="Block Dodger: move the paddle left and right to dodge falling blocks and catch coins"></canvas>
+<canvas id="game" aria-label="Sunset Bay: an open-world crime game. Explore the city on foot or by car, take on missions, and watch out for the police."></canvas>
 <p id="status" role="status" aria-live="polite"></p>
+
+<div id="hud">
+  <div id="stats" class="panel">
+    <div id="wanted-stars"></div>
+    <div id="health-row"><div id="health-bar"><div id="health-fill"></div></div><span id="health-text">100</span></div>
+    <div id="cash">$250</div>
+    <div id="clock">16:30</div>
+    <div id="mission-label">Sunset Bay</div>
+  </div>
+  <div id="objective" class="panel"><span id="objective-text"></span></div>
+  <div id="minimap-wrap" class="panel"><canvas id="minimap" width="200" height="200"></canvas></div>
+  <div id="speed"></div>
+  <div id="hint"></div>
+  <div id="flash-message"></div>
+  <div id="banner"><div id="banner-title"></div><div id="banner-sub"></div></div>
+  <div id="crosshair"></div>
+  <div id="briefing" class="panel"><div id="briefing-title"></div><div id="briefing-text"></div></div>
+</div>
+<div id="vignette"></div>
+
+<div id="title-screen" class="overlay">
+  <h1>SUNSET BAY</h1>
+  <h2>AN OPEN-WORLD CRIME STORY</h2>
+  <p>Dana Reyes came home to Sunset Bay with nothing but a duffel bag and a debt.
+     Six missions stand between Dana and the big score — steal cars, outrun the
+     Sunset Bay PD, settle scores at Coral Plaza, and take what the city owes you.</p>
+  <div class="controls">
+    WASD move &nbsp;·&nbsp; Mouse drag to look &nbsp;·&nbsp; E enter / steal car &nbsp;·&nbsp; F punch<br>
+    1 draw pistol &nbsp;·&nbsp; Click shoot &nbsp;·&nbsp; R reload &nbsp;·&nbsp; N start mission<br>
+    Shift run &nbsp;·&nbsp; Space handbrake &nbsp;·&nbsp; Esc pause &nbsp;·&nbsp; M mute
+  </div>
+  <button id="new-game-btn">New Game</button>
+  <button id="continue-btn" class="ghost">Continue</button>
+  <div id="title-best"></div>
+</div>
+
+<div id="pause-screen" class="overlay">
+  <h1 style="font-size:44px">PAUSED</h1>
+  <p>Sunset Bay waits for no one — except right now.</p>
+  <button id="resume-btn">Resume</button>
+  <button id="save-btn" class="ghost">Save Game</button>
+  <button id="quit-title-btn" class="ghost">Quit to Title</button>
+</div>
+
+<div id="end-screen" class="overlay">
+  <h1 id="end-title">BUSTED</h1>
+  <p id="end-text"></p>
+  <button id="end-respawn-btn">Get Back Out There</button>
+  <button id="end-title-btn" class="ghost">Title Screen</button>
+</div>
+
 <script type="module" src="./src/main.js"></script>
 </body>
 </html>
